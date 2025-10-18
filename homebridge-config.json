@@ -1,0 +1,55 @@
+{
+  "accessories": [
+    {
+      "accessory": "mqttthing",
+      "type": "thermostat",
+      "name": "冷氣",
+      "url": "mqtt://192.168.8.181:1883",
+      "username": "",
+      "password": "",
+      "topics": {
+        "getTargetHeatingCoolingState": {
+          "topic": "homebridge/ac/state",
+          "apply": "var state = JSON.parse(message); return state.power === 'ON' ? 2 : 0;"
+        },
+        "setTargetHeatingCoolingState": {
+          "topic": "homebridge/ac/mode/set",
+          "apply": "var mode = message; console.log('Homebridge sending mode:', mode, typeof mode); if (mode === 'COOL' || mode === 2) { return JSON.stringify({mode: 'cool'}); } else { return JSON.stringify({mode: 'off'}); }"
+        },
+        "getCurrentHeatingCoolingState": {
+          "topic": "homebridge/ac/state",
+          "apply": "var state = JSON.parse(message); return state.power === 'ON' ? 2 : 0;"
+        },
+        "getTargetTemperature": {
+          "topic": "homebridge/ac/state",
+          "apply": "return JSON.parse(message).temperature;"
+        },
+        "setTargetTemperature": {
+          "topic": "homebridge/ac/temperature/set",
+          "apply": "return JSON.stringify({temperature: Math.round(Number(message))});"
+        },
+        "getCurrentTemperature": {
+          "topic": "homebridge/ac/state",
+          "apply": "return JSON.parse(message).temperature;"
+        },
+        "getRotationSpeed": {
+          "topic": "homebridge/ac/state",
+          "apply": "var fan = JSON.parse(message).fanSpeed; var speeds = {auto: 25, low: 33, medium: 66, high: 100}; return speeds[fan] || 25;"
+        },
+        "setRotationSpeed": {
+          "topic": "homebridge/ac/fan/set",
+          "apply": "var speed = Number(message); var fan = 'auto'; if (speed >= 75) fan = 'high'; else if (speed >= 50) fan = 'medium'; else if (speed >= 30) fan = 'low'; return JSON.stringify({fanSpeed: fan});"
+        }
+      },
+      "integerValue": true,
+      "minTemperature": 16,
+      "maxTemperature": 30,
+      "temperatureDisplayUnits": 0,
+      "restrictHeatingCoolingState": [0, 2],
+      "minStep": 1,
+      "showRotationDirection": false,
+      "rotationSpeedSteps": 4,
+      "fanOnly": false
+    }
+  ]
+}

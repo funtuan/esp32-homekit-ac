@@ -1,0 +1,53 @@
+/**
+ * 配置文件範本
+ * 
+ * 使用說明：
+ * 1. 複製此文件為 config.h
+ * 2. 填入您的實際配置資訊
+ * 3. config.h 已被 .gitignore 排除，不會被上傳
+ */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// ==================== WiFi 配置 ====================
+// 填入您的 WiFi 網路名稱
+#define WIFI_SSID           "YOUR_WIFI_SSID"
+
+// 填入您的 WiFi 密碼
+#define WIFI_PASSWORD       "YOUR_WIFI_PASSWORD"
+
+// ==================== MQTT 配置 ====================
+// 填入您的 MQTT Broker IP 地址（例如：192.168.1.100）
+#define MQTT_SERVER         "YOUR_MQTT_SERVER_IP"
+
+// MQTT Broker 端口（通常是 1883）
+#define MQTT_PORT           1883
+
+// MQTT 客戶端 ID（可以保持預設或自訂）
+#define MQTT_CLIENT_ID      "ESP32_AC_Controller"
+
+// MQTT 用戶名（如不需要認證請留空）
+#define MQTT_USER           ""
+
+// MQTT 密碼（如不需要認證請留空）
+#define MQTT_PASSWORD       ""
+
+// ==================== MQTT 主題配置 ====================
+#define TOPIC_COMMAND       "homebridge/ac/command"
+#define TOPIC_STATE         "homebridge/ac/state"
+#define TOPIC_TEMP_SET      "homebridge/ac/temperature/set"
+#define TOPIC_TEMP_STATE    "homebridge/ac/temperature/state"
+#define TOPIC_MODE_SET      "homebridge/ac/mode/set"
+#define TOPIC_MODE_STATE    "homebridge/ac/mode/state"
+#define TOPIC_FAN_SET       "homebridge/ac/fan/set"
+#define TOPIC_FAN_STATE     "homebridge/ac/fan/state"
+
+// ==================== 硬體配置 ====================
+// 紅外線發射 GPIO 引腳
+#define IR_TX_GPIO          4
+
+// 內建 LED 引腳
+#define LED_BUILTIN         2
+
+#endif // CONFIG_H
