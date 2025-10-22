@@ -31,14 +31,6 @@
         "getCurrentTemperature": {
           "topic": "homebridge/ac/state",
           "apply": "return JSON.parse(message).temperature;"
-        },
-        "getRotationSpeed": {
-          "topic": "homebridge/ac/state",
-          "apply": "var fan = JSON.parse(message).fanSpeed; var speeds = {auto: 25, low: 33, medium: 66, high: 100}; return speeds[fan] || 25;"
-        },
-        "setRotationSpeed": {
-          "topic": "homebridge/ac/fan/set",
-          "apply": "var speed = Number(message); var fan = 'auto'; if (speed >= 75) fan = 'high'; else if (speed >= 50) fan = 'medium'; else if (speed >= 30) fan = 'low'; return JSON.stringify({fanSpeed: fan});"
         }
       },
       "integerValue": true,
@@ -46,10 +38,35 @@
       "maxTemperature": 30,
       "temperatureDisplayUnits": 0,
       "restrictHeatingCoolingState": [0, 2],
-      "minStep": 1,
-      "showRotationDirection": false,
-      "rotationSpeedSteps": 4,
-      "fanOnly": false
+      "minStep": 1
+    },
+    {
+      "accessory": "mqttthing",
+      "type": "fanv2",
+      "name": "冷氣風扇",
+      "url": "mqtt://192.168.8.181:1883",
+      "username": "",
+      "password": "",
+      "topics": {
+        "getActive": {
+          "topic": "homebridge/ac/fan/state",
+          "apply": "var state = JSON.parse(message); return state.active ? 1 : 0;"
+        },
+        "setActive": {
+          "topic": "homebridge/ac/fan/active/set",
+          "apply": "return JSON.stringify({active: message == 1});"
+        },
+        "getRotationSpeed": {
+          "topic": "homebridge/ac/fan/state",
+          "apply": "var speeds = {auto: 25, low: 33, medium: 66, high: 100}; return speeds[JSON.parse(message).fanSpeed] || 25;"
+        },
+        "setRotationSpeed": {
+          "topic": "homebridge/ac/fan/speed/set",
+          "apply": "var speed = Number(message); var fan = 'auto'; if (speed >= 75) fan = 'high'; else if (speed >= 50) fan = 'medium'; else if (speed >= 30) fan = 'low'; return JSON.stringify({fanSpeed: fan});"
+        }
+      },
+      "restrictTargetFanState": [0, 1],
+      "minStep": 25
     }
   ]
 }

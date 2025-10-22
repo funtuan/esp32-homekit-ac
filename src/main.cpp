@@ -32,7 +32,7 @@ struct ACState {
     bool power = false;
     uint8_t temperature = 26;
     uint8_t mode = 1;  // 0:Auto, 1:Cool, 2:Dry, 3:Fan, 4:Heat
-    uint8_t fanSpeed = 3;  // 固定最大風量: 3:High
+    uint8_t fanSpeed = 0;  // 0:Auto, 1:Low, 2:Medium, 3:High
 } acState;
 
 // ==================== 函數前置宣告 ====================
@@ -177,15 +177,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         
         if (strcmp(cmd, "ON") == 0) {
             acState.power = true;
-            acState.mode = 1;  // 強制冷氣模式
-            acState.fanSpeed = 3;  // 強制最大風量
-            sendPanasonicAC(true, acState.temperature, acState.mode, 3);
+            acState.mode = 1;  // 冷氣模式
+            sendPanasonicAC(true, acState.temperature, acState.mode, acState.fanSpeed);
             publishACState();
         }
         else if (strcmp(cmd, "OFF") == 0) {
             acState.power = false;
-            acState.fanSpeed = 3;  // 強制最大風量
-            sendPanasonicAC(false, acState.temperature, acState.mode, 3);
+            sendPanasonicAC(false, acState.temperature, acState.mode, acState.fanSpeed);
             publishACState();
         }
     }
@@ -193,13 +191,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         int temp = doc["temperature"];
         if (temp >= 16 && temp <= 30) {
             acState.temperature = temp;
-            acState.mode = 1;  // 強制冷氣模式
-            acState.fanSpeed = 3;  // 強制最大風量
+            acState.mode = 1;  // 冷氣模式
             Serial.printf("🌡️ 設定溫度: %d°C\n", temp);
             
             // 如果冷氣是開啟狀態，發送紅外線
             if (acState.power) {
-                sendPanasonicAC(true, acState.temperature, acState.mode, 3);
+                sendPanasonicAC(true, acState.temperature, acState.mode, acState.fanSpeed);
                 publishACState();
             } else {
                 // 即使關機也更新狀態（不發送紅外線）
@@ -215,37 +212,69 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         if (strcmp(mode, "cool") == 0) {
             acState.power = true;
             acState.mode = 1;  // 冷氣模式
-            acState.fanSpeed = 3;  // 強制最大風量
-            Serial.println("🟢 收到開機指令 (冷氣模式 + 最大風量)");
+            Serial.println("🟢 收到開機指令 (冷氣模式)");
             Serial.printf("🔍 Debug: acState.power = %d\n", acState.power);
         } 
         else if (strcmp(mode, "off") == 0) {
             acState.power = false;
             acState.mode = 1;  // 保持冷氣模式設定
-            acState.fanSpeed = 3;  // 強制最大風量
             Serial.println("🔴 收到關機指令");
             Serial.printf("🔍 Debug: acState.power = %d\n", acState.power);
         }
         else {
             // 其他模式都視為關機
             acState.power = false;
-            acState.fanSpeed = 3;  // 強制最大風量
             Serial.printf("⚠️ 未知模式: %s，視為關機\n", mode);
         }
         
-        // 發送紅外線指令（強制最大風量）
-        sendPanasonicAC(acState.power, acState.temperature, acState.mode, 3);
+        // 發送紅外線指令
+        sendPanasonicAC(acState.power, acState.temperature, acState.mode, acState.fanSpeed);
         publishACState();
     }
     else if (strcmp(topic, TOPIC_FAN_SET) == 0) {
-        // 忽略風量設定，強制使用最大風量
-        acState.fanSpeed = 3;  // 強制最大風量
-        acState.mode = 1;  // 強制冷氣模式
-        Serial.println("💨 收到風量設定（已忽略，固定使用最大風量）");
+        // 處理風量設定（從 thermostat 的 RotationSpeed）
+        const char* fanSpeed = doc["fanSpeed"];
+        
+        if (strcmp(fanSpeed, "auto") == 0) acState.fanSpeed = 0;
+        else if (strcmp(fanSpeed, "low") == 0) acState.fanSpeed = 1;
+        else if (strcmp(fanSpeed, "medium") == 0) acState.fanSpeed = 2;
+        else if (strcmp(fanSpeed, "high") == 0) acState.fanSpeed = 3;
+        
+        Serial.printf("💨 設定風量: %s\n", fanSpeed);
         
         // 如果冷氣是開啟狀態，發送紅外線
         if (acState.power) {
-            sendPanasonicAC(true, acState.temperature, acState.mode, 3);
+            sendPanasonicAC(true, acState.temperature, acState.mode, acState.fanSpeed);
+            publishACState();
+        } else {
+            // 即使關機也更新狀態（不發送紅外線）
+            publishACState();
+        }
+    }
+    else if (strcmp(topic, TOPIC_FAN_ACTIVE_SET) == 0) {
+        // 處理風扇啟用/停用（從 fanv2）
+        bool active = doc["active"];
+        acState.power = active;
+        
+        Serial.printf("💨 風扇 %s\n", active ? "啟用" : "停用");
+        
+        sendPanasonicAC(acState.power, acState.temperature, acState.mode, acState.fanSpeed);
+        publishACState();
+    }
+    else if (strcmp(topic, TOPIC_FAN_SPEED_SET) == 0) {
+        // 處理風速設定（從 fanv2 的 RotationSpeed）
+        const char* fanSpeed = doc["fanSpeed"];
+        
+        if (strcmp(fanSpeed, "auto") == 0) acState.fanSpeed = 0;
+        else if (strcmp(fanSpeed, "low") == 0) acState.fanSpeed = 1;
+        else if (strcmp(fanSpeed, "medium") == 0) acState.fanSpeed = 2;
+        else if (strcmp(fanSpeed, "high") == 0) acState.fanSpeed = 3;
+        
+        Serial.printf("💨💨 設定風速: %s\n", fanSpeed);
+        
+        // 如果冷氣是開啟狀態，發送紅外線
+        if (acState.power) {
+            sendPanasonicAC(true, acState.temperature, acState.mode, acState.fanSpeed);
             publishACState();
         } else {
             // 即使關機也更新狀態（不發送紅外線）
@@ -256,10 +285,16 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 // ==================== MQTT 連接 ====================
 void connectMQTT() {
-    while (!mqttClient.connected()) {
-        Serial.println("🔌 連接 MQTT Broker...");
+    int retries = 0;
+    const int maxRetries = 3;
+    
+    while (!mqttClient.connected() && retries < maxRetries) {
+        Serial.printf("🔌 連接 MQTT Broker... (嘗試 %d/%d)\n", retries + 1, maxRetries);
         
-        if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASSWORD)) {
+        // 生成唯一的客戶端 ID（加上時間戳避免衝突）
+        String clientId = String(MQTT_CLIENT_ID) + "-" + String(millis());
+        
+        if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
             Serial.println("✓ MQTT 已連接!");
             
             // 訂閱控制主題
@@ -267,25 +302,49 @@ void connectMQTT() {
             mqttClient.subscribe(TOPIC_TEMP_SET);
             mqttClient.subscribe(TOPIC_MODE_SET);
             mqttClient.subscribe(TOPIC_FAN_SET);
+            mqttClient.subscribe(TOPIC_FAN_ACTIVE_SET);
+            mqttClient.subscribe(TOPIC_FAN_SPEED_SET);
             
             Serial.println("✓ 已訂閱控制主題");
             
             // 發布初始狀態
             publishACState();
+            
+            retries = 0;  // 重置重試計數器
         } else {
-            Serial.printf("❌ MQTT 連接失敗, rc=%d\n", mqttClient.state());
-            Serial.println("5秒後重試...");
-            delay(5000);
+            retries++;
+            Serial.printf("❌ MQTT 連接失敗, rc=%d", mqttClient.state());
+            
+            // 顯示錯誤原因
+            switch (mqttClient.state()) {
+                case -4: Serial.println(" (連接超時)"); break;
+                case -3: Serial.println(" (連接中斷)"); break;
+                case -2: Serial.println(" (連接失敗)"); break;
+                case -1: Serial.println(" (已斷開)"); break;
+                case 1: Serial.println(" (協議版本錯誤)"); break;
+                case 2: Serial.println(" (客戶端 ID 被拒)"); break;
+                case 3: Serial.println(" (服務器不可用)"); break;
+                case 4: Serial.println(" (用戶名/密碼錯誤)"); break;
+                case 5: Serial.println(" (未授權)"); break;
+                default: Serial.println(" (未知錯誤)"); break;
+            }
+            
+            if (retries < maxRetries) {
+                Serial.println("3秒後重試...");
+                delay(3000);
+            } else {
+                Serial.println("⚠️ 達到最大重試次數，將在下次循環重試");
+                delay(10000);  // 等待 10 秒後再重試
+                retries = 0;
+            }
         }
     }
 }
 
 // ==================== 發布 AC 狀態 ====================
 void publishACState() {
+    // 發布到主要狀態主題（給 thermostat 使用）
     JsonDocument doc;
-    
-    // 確保風量始終為最大
-    acState.fanSpeed = 3;
     
     doc["power"] = acState.power ? "ON" : "OFF";
     doc["temperature"] = acState.temperature;
@@ -293,14 +352,25 @@ void publishACState() {
     const char* modeStr[] = {"auto", "cool", "dry", "fan", "heat"};
     doc["mode"] = modeStr[acState.mode];
     
-    // 固定顯示最大風量
-    doc["fanSpeed"] = "high";
+    const char* fanStr[] = {"auto", "low", "medium", "high"};
+    doc["fanSpeed"] = fanStr[acState.fanSpeed];
     
     String output;
     serializeJson(doc, output);
     
     mqttClient.publish(TOPIC_STATE, output.c_str(), true);  // retained message
     Serial.printf("📤 發布狀態: %s\n", output.c_str());
+    
+    // 發布到風扇狀態主題（給 fanv2 使用）
+    JsonDocument fanDoc;
+    fanDoc["active"] = acState.power;
+    fanDoc["fanSpeed"] = fanStr[acState.fanSpeed];
+    
+    String fanOutput;
+    serializeJson(fanDoc, fanOutput);
+    
+    mqttClient.publish(TOPIC_FAN_STATE, fanOutput.c_str(), true);
+    Serial.printf("📤 發布風扇狀態: %s\n", fanOutput.c_str());
 }
 
 // ==================== WiFi 連接 ====================
@@ -416,10 +486,18 @@ void handleSend() {
         response = "✓ 送風模式";
     }
     else if (cmd == "fan_auto" || cmd == "fan_low" || cmd == "fan_medium" || cmd == "fan_high") {
-        // 所有風量設定都使用最大風量
-        sendPanasonicAC(true, acState.temperature, 1, 3);
+        uint8_t fan = 0;
+        if (cmd == "fan_auto") fan = 0;
+        else if (cmd == "fan_low") fan = 1;
+        else if (cmd == "fan_medium") fan = 2;
+        else if (cmd == "fan_high") fan = 3;
+        
+        acState.fanSpeed = fan;
+        sendPanasonicAC(true, acState.temperature, 1, fan);
         publishACState();
-        response = "✓ 風量: 高（固定最大）";
+        
+        const char* fanStr[] = {"自動", "低", "中", "高"};
+        response = "✓ 風量: " + String(fanStr[fan]);
     }
     
     server.send(200, "text/plain", response);
@@ -480,12 +558,21 @@ void setup() {
 void loop() {
     // 確保 MQTT 連接
     if (!mqttClient.connected()) {
+        Serial.println("⚠️ MQTT 連接中斷，重新連接...");
         connectMQTT();
     }
+    
+    // 處理 MQTT 訊息
     mqttClient.loop();
     
     // 處理 Web 請求
     server.handleClient();
+    
+    // 保持 WiFi 連接
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("⚠️ WiFi 連接中斷，重新連接...");
+        setupWiFi();
+    }
     
     delay(10);
 }

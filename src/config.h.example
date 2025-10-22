@@ -43,6 +43,10 @@
 #define TOPIC_FAN_SET       "homebridge/ac/fan/set"
 #define TOPIC_FAN_STATE     "homebridge/ac/fan/state"
 
+// ==================== MQTT Fanv2 主題配置 ====================
+#define TOPIC_FAN_ACTIVE_SET    "homebridge/ac/fan/active/set"
+#define TOPIC_FAN_SPEED_SET     "homebridge/ac/fan/speed/set"
+
 // ==================== 硬體配置 ====================
 // 紅外線發射 GPIO 引腳
 #define IR_TX_GPIO          4
